@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  web:
+    image: python:3.9-slim
+    container_name: aws_ecommerce_app
+    env_file:
+      - .env
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "pip install --no-cache-dir -r requirements.txt &&
+             python manage.py collectstatic --noinput &&
+             gunicorn aws_ecommerce.wsgi:application --bind 0.0.0.0:8000"
