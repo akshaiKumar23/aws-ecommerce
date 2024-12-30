@@ -1,6 +1,10 @@
+version: "3.8"
 services:
   web:
-    image: python:3.9-slim
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aws_ecommerce_app:latest
     container_name: aws_ecommerce_app
     env_file:
       - .env

@@ -1,21 +1,35 @@
+variables:
+  DOCKER_IMAGE: "$AWS_ECR_REGISTRY/$AWS_ECR_REPOSITORY:$CI_COMMIT_REF_SLUG"
+  AWS_DEFAULT_REGION: $AWS_REGION_NAME
+
 stages:
   - build
   - deploy
 
-variables:
-  DOCKER_IMAGE: "$AWS_ECR_REGISTRY/$AWS_ECR_REPOSITORY:$CI_COMMIT_REF_SLUG"
-
-before_script:
-  - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-  - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-  - aws configure set default.region $AWS_REGION_NAME
-  - aws ecr get-login-password --region $AWS_REGION_NAME | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY
-
 build:
   stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - apk add --no-cache python3 py3-pip py3-virtualenv curl unzip
+    - python3 -m venv aws_env
+    - source aws_env/bin/activate
+    - pip install awscli --upgrade
+    - export PATH=$PATH:$(pwd)/aws_env/bin
+    - aws --version
+    - echo $AWS_ACCESS_KEY_ID
+    - echo $AWS_SECRET_ACCESS_KEY
+    - echo $AWS_DEFAULT_REGION
+
   script:
+    - aws ecr get-login-password --region $AWS_REGION_NAME | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY
+    - echo "Building Docker image..."
     - docker-compose build
+    - docker images # Verify the built image
+    - echo "Tagging Docker image..."
     - docker tag aws_ecommerce_app:latest $DOCKER_IMAGE
+    - echo "Pushing Docker image..."
     - docker push $DOCKER_IMAGE
   only:
     - main
@@ -24,10 +38,7 @@ deploy:
   stage: deploy
   image: amazon/aws-cli
   script:
+    - echo "Deploying to ECS..."
     - aws ecs update-service --cluster $AWS_ECS_CLUSTER --service $AWS_ECS_SERVICE --force-new-deployment
   only:
     - main
-
-default:
-  tags:
-    - docker
